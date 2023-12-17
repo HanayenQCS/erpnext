@@ -1,0 +1,50 @@
+{
+ "cards": [
+  {
+   "card": "Annual Purchase"
+  },
+  {
+   "card": "Purchase Orders to Receive"
+  },
+  {
+   "card": "Purchase Orders to Bill"
+  },
+  {
+   "card": "Active Suppliers"
+  }
+ ],
+ "charts": [
+  {
+   "chart": "Purchase Order Trends",
+   "width": "Full"
+  },
+  {
+   "chart": "Material Request Analysis",
+   "width": "Half"
+  },
+  {
+   "chart": "Purchase Order Analysis",
+   "width": "Half"
+  },
+  {
+   "chart": "Top Suppliers",
+   "width": "Full"
+  },
+  {
+   "chart": "Purchase Order Analysis-Supplier Group wise",
+   "width": "Half"
+  }
+ ],
+ "creation": "2022-09-01 19:02:12.817657",
+ "dashboard_name": "Buying",
+ "docstatus": 0,
+ "doctype": "Dashboard",
+ "idx": 0,
+ "is_default": 0,
+ "is_standard": 1,
+ "modified": "2023-09-11 14:24:18.197431",
+ "modified_by": "support@hanayen.ae",
+ "module": "Buying",
+ "name": "Buying",
+ "owner": "support@quarkcs.com"
+}

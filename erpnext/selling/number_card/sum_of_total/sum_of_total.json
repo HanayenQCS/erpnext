@@ -1,0 +1,22 @@
+{
+ "creation": "2023-01-27 14:18:24.304148",
+ "docstatus": 0,
+ "doctype": "Number Card",
+ "filters_json": "{\"tree_type\":\"Customer Group\",\"doc_type\":\"Sales Order\",\"value_quantity\":\"Value\",\"from_date\":\"2023-01-01\",\"to_date\":\"2023-01-31\",\"company\":\"Hanayen Group\",\"range\":\"Yearly\"}",
+ "function": "Count",
+ "idx": 0,
+ "is_public": 0,
+ "is_standard": 1,
+ "label": "Sum of Total",
+ "modified": "2023-01-27 14:18:24.363882",
+ "modified_by": "navin@hanayen.com",
+ "module": "Selling",
+ "name": "Sum of Total",
+ "owner": "navin@hanayen.com",
+ "report_field": "total",
+ "report_function": "Sum",
+ "report_name": "Sales Analytics",
+ "show_percentage_stats": 1,
+ "stats_time_interval": "Daily",
+ "type": "Report"
+}

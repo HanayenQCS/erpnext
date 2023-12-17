@@ -1,0 +1,43 @@
+{
+ "add_total_row": 1,
+ "columns": [],
+ "creation": "2023-01-05 17:13:17.020231",
+ "disable_prepared_report": 0,
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "json": "{\"filters\":[[\"Stock Entry\",\"to_warehouse\",\"=\",\"Deira City Center - HAE\",false],[\"Stock Entry\",\"posting_date\",\"=\",\"2023-01-05\",false],[\"Stock Entry\",\"stock_entry_type\",\"=\",\"Material Transfer\"]],\"fields\":[[\"name\",\"Stock Entry\"],[\"docstatus\",\"Stock Entry\"],[\"stock_entry_type\",\"Stock Entry\"],[\"order_form_qcs\",\"Stock Entry\"],[\"sampling_work_order\",\"Stock Entry\"],[\"to_warehouse\",\"Stock Entry\"],[\"item_code\",\"Stock Entry Detail\"],[\"qty\",\"Stock Entry Detail\"],[\"amount\",\"Stock Entry Detail\"],[\"valuation_rate\",\"Stock Entry Detail\"],[\"work_order\",\"Stock Entry\"]],\"order_by\":\"`tabStock Entry`.`modified` desc\",\"add_totals_row\":true,\"page_length\":20,\"column_widths\":{\"name\":120,\"docstatus\":120,\"stock_entry_type\":120,\"order_form_qcs\":120,\"sampling_work_order\":120,\"to_warehouse\":120,\"Stock Entry Detail:item_code\":120,\"Stock Entry Detail:qty\":120,\"Stock Entry Detail:amount\":120,\"Stock Entry Detail:valuation_rate\":120,\"work_order\":120},\"group_by\":null}",
+ "letter_head": "Default Letterhead",
+ "modified": "2023-01-05 17:17:36.721244",
+ "modified_by": "Administrator",
+ "module": "Stock",
+ "name": "SHOP DELIVERY",
+ "owner": "mizan@hanayentextiles.ae",
+ "prepared_report": 0,
+ "ref_doctype": "Stock Entry",
+ "report_name": "SHOP DELIVERY",
+ "report_type": "Report Builder",
+ "roles": [
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Manufacturing Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Shop User"
+  }
+ ]
+}

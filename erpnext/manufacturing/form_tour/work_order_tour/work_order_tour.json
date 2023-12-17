@@ -1,0 +1,28 @@
+{
+ "creation": "2023-01-14 01:21:36.465691",
+ "docstatus": 0,
+ "doctype": "Form Tour",
+ "first_document": 0,
+ "idx": 0,
+ "include_name_field": 0,
+ "is_standard": 1,
+ "modified": "2023-01-14 01:22:03.977774",
+ "modified_by": "Administrator",
+ "module": "Manufacturing",
+ "name": "Work Order Tour",
+ "owner": "Administrator",
+ "reference_doctype": "Work Order",
+ "save_on_complete": 1,
+ "steps": [
+  {
+   "description": "Make sure this item is same as in order form",
+   "fieldname": "item",
+   "fieldtype": "Section Break",
+   "has_next_condition": 0,
+   "is_table_field": 0,
+   "position": "Left Center",
+   "title": "Select Item to manufacture"
+  }
+ ],
+ "title": "Work Order Tour"
+}

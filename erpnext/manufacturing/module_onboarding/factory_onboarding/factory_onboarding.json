@@ -1,0 +1,35 @@
+{
+ "allow_roles": [
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Stock Manager"
+  }
+ ],
+ "creation": "2023-01-14 01:30:22.965904",
+ "docstatus": 0,
+ "doctype": "Module Onboarding",
+ "documentation_url": "https://github.com/frappe/erpnext",
+ "idx": 0,
+ "is_complete": 0,
+ "modified": "2023-01-14 01:30:22.965904",
+ "modified_by": "Administrator",
+ "module": "Manufacturing",
+ "name": "Factory Onboarding",
+ "owner": "Administrator",
+ "steps": [
+  {
+   "step": "Work Order"
+  }
+ ],
+ "subtitle": "Factory Onboarding",
+ "success_message": "Thank you!",
+ "title": "Factory Onboarding"
+}
