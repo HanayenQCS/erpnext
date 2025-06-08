@@ -95,8 +95,9 @@
   "shipping_address",
   "company_address_section",
   "company_address",
-  "column_break_87",
   "company_address_display",
+  "column_break_87",
+  "company_contact_person",
   "terms_tab",
   "payment_schedule_section",
   "payment_terms_template",
@@ -416,7 +417,6 @@
    "fieldname": "items_section",
    "fieldtype": "Section Break",
    "hide_border": 1,
-   "label": "Items",
    "oldfieldtype": "Section Break",
    "options": "fa fa-shopping-cart"
   },
@@ -424,6 +424,7 @@
    "allow_bulk_edit": 1,
    "fieldname": "items",
    "fieldtype": "Table",
+   "label": "Items",
    "oldfieldname": "quotation_details",
    "oldfieldtype": "Table",
    "options": "Quotation Item",
@@ -556,7 +557,7 @@
   },
   {
    "fieldname": "other_charges_calculation",
-   "fieldtype": "Long Text",
+   "fieldtype": "Text Editor",
    "label": "Taxes and Charges Calculation",
    "no_copy": 1,
    "oldfieldtype": "HTML",
@@ -1066,13 +1067,20 @@
    "fieldname": "named_place",
    "fieldtype": "Data",
    "label": "Named Place"
+  },
+  {
+   "fieldname": "company_contact_person",
+   "fieldtype": "Link",
+   "label": "Company Contact Person",
+   "options": "Contact",
+   "print_hide": 1
   }
  ],
  "icon": "fa fa-shopping-cart",
  "idx": 82,
  "is_submittable": 1,
  "links": [],
- "modified": "2022-12-12 18:32:28.671332",
+ "modified": "2024-11-26 12:43:29.293637",
  "modified_by": "Administrator",
  "module": "Selling",
  "name": "Quotation",

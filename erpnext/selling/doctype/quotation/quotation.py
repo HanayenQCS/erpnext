@@ -22,9 +22,10 @@ class Quotation(SellingController):
 			self.indicator_title = "Expired"
 
 	def validate(self):
-		super(Quotation, self).validate()
+		super().validate()
 		self.set_status()
-		self.validate_uom_is_integer("stock_uom", "qty")
+		self.validate_uom_is_integer("stock_uom", "stock_qty")
+		self.validate_uom_is_integer("uom", "qty")
 		self.validate_valid_till()
 		self.validate_shopping_cart_items()
 		self.set_customer_name()
@@ -34,6 +35,9 @@ class Quotation(SellingController):
 		from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
 
 		make_packing_list(self)
+
+	def before_submit(self):
+		self.set_has_alternative_item()
 
 	def validate_valid_till(self):
 		if self.valid_till and getdate(self.valid_till) < getdate(self.transaction_date):
@@ -59,7 +63,18 @@ class Quotation(SellingController):
 					title=_("Unpublished Item"),
 				)
 
+	def set_has_alternative_item(self):
+		"""Mark 'Has Alternative Item' for rows."""
+		if not any(row.is_alternative for row in self.get("items")):
+			return
+
+		items_with_alternatives = self.get_rows_with_alternatives()
+		for row in self.get("items"):
+			if not row.is_alternative and row.name in items_with_alternatives:
+				row.has_alternative_item = 1
+
 	def get_ordered_status(self):
+		status = "Open"
 		ordered_items = frappe._dict(
 			frappe.db.get_all(
 				"Sales Order Item",
@@ -70,15 +85,40 @@ class Quotation(SellingController):
 			)
 		)
 
-		status = "Open"
-		if ordered_items:
+		if not ordered_items:
+			return status
+
+		has_alternatives = any(row.is_alternative for row in self.get("items"))
+		self._items = self.get_valid_items() if has_alternatives else self.get("items")
+
+		if any(row.qty > ordered_items.get(row.item_code, 0.0) for row in self._items):
+			status = "Partially Ordered"
+		else:
 			status = "Ordered"
 
-			for item in self.get("items"):
-				if item.qty > ordered_items.get(item.item_code, 0.0):
-					status = "Partially Ordered"
-
 		return status
+
+	def get_valid_items(self):
+		"""
+		Filters out items in an alternatives set that were not ordered.
+		"""
+
+		def is_in_sales_order(row):
+			in_sales_order = bool(
+				frappe.db.exists(
+					"Sales Order Item",
+					{"quotation_item": row.name, "item_code": row.item_code, "docstatus": 1},
+				)
+			)
+			return in_sales_order
+
+		def can_map(row) -> bool:
+			if row.is_alternative or row.has_alternative_item:
+				return is_in_sales_order(row)
+
+			return True
+
+		return list(filter(can_map, self.get("items")))
 
 	def is_fully_ordered(self):
 		return self.get_ordered_status() == "Ordered"
@@ -157,7 +197,7 @@ class Quotation(SellingController):
 	def on_cancel(self):
 		if self.lost_reasons:
 			self.lost_reasons = []
-		super(Quotation, self).on_cancel()
+		super().on_cancel()
 
 		# update enquiry status
 		self.set_status(update=True)
@@ -175,6 +215,22 @@ class Quotation(SellingController):
 
 	def on_recurring(self, reference_doc, auto_repeat_doc):
 		self.valid_till = None
+
+	def get_rows_with_alternatives(self):
+		rows_with_alternatives = []
+		table_length = len(self.get("items"))
+
+		for idx, row in enumerate(self.get("items")):
+			if row.is_alternative:
+				continue
+
+			if idx == (table_length - 1):
+				break
+
+			if self.get("items")[idx + 1].is_alternative:
+				rows_with_alternatives.append(row.name)
+
+		return rows_with_alternatives
 
 
 def get_list_context(context=None):
@@ -194,14 +250,18 @@ def get_list_context(context=None):
 
 
 @frappe.whitelist()
-def make_sales_order(source_name, target_doc=None):
-	quotation = frappe.db.get_value(
-		"Quotation", source_name, ["transaction_date", "valid_till"], as_dict=1
-	)
-	if quotation.valid_till and (
-		quotation.valid_till < quotation.transaction_date or quotation.valid_till < getdate(nowdate())
+def make_sales_order(source_name: str, target_doc=None):
+	if not frappe.db.get_singles_value(
+		"Selling Settings", "allow_sales_order_creation_for_expired_quotation"
 	):
-		frappe.throw(_("Validity period of this quotation has ended."))
+		quotation = frappe.db.get_value(
+			"Quotation", source_name, ["transaction_date", "valid_till"], as_dict=1
+		)
+		if quotation.valid_till and (
+			quotation.valid_till < quotation.transaction_date or quotation.valid_till < getdate(nowdate())
+		):
+			frappe.throw(_("Validity period of this quotation has ended."))
+
 	return _make_sales_order(source_name, target_doc)
 
 
@@ -217,6 +277,8 @@ def _make_sales_order(source_name, target_doc=None, ignore_permissions=False):
 		)
 	)
 
+	selected_rows = [x.get("name") for x in frappe.flags.get("args", {}).get("selected_items", [])]
+
 	def set_missing_values(source, target):
 		if customer:
 			target.customer = customer.name
@@ -226,6 +288,19 @@ def _make_sales_order(source_name, target_doc=None, ignore_permissions=False):
 			target.commission_rate = frappe.get_value(
 				"Sales Partner", source.referral_sales_partner, "commission_rate"
 			)
+
+		# sales team
+		if not target.get("sales_team"):
+			for d in customer.get("sales_team") or []:
+				target.append(
+					"sales_team",
+					{
+						"sales_person": d.sales_person,
+						"allocated_percentage": d.allocated_percentage or None,
+						"commission_rate": d.commission_rate,
+					},
+				)
+
 		target.flags.ignore_permissions = ignore_permissions
 		target.run_method("set_missing_values")
 		target.run_method("calculate_taxes_and_totals")
@@ -240,6 +315,28 @@ def _make_sales_order(source_name, target_doc=None, ignore_permissions=False):
 			target.blanket_order = obj.blanket_order
 			target.blanket_order_rate = obj.blanket_order_rate
 
+	def can_map_row(item) -> bool:
+		"""
+		Row mapping from Quotation to Sales order:
+		1. If no selections, map all non-alternative rows (that sum up to the grand total)
+		2. If selections: Is Alternative Item/Has Alternative Item: Map if selected and adequate qty
+		3. If selections: Simple row: Map if adequate qty
+		"""
+		balance_qty = item.qty - ordered_items.get(item.item_code, 0.0)
+		if balance_qty <= 0:
+			return False
+
+		has_qty = balance_qty
+
+		if not selected_rows:
+			return not item.is_alternative
+
+		if selected_rows and (item.is_alternative or item.has_alternative_item):
+			return (item.name in selected_rows) and has_qty
+
+		# Simple row
+		return has_qty
+
 	doclist = get_mapped_doc(
 		"Quotation",
 		source_name,
@@ -249,7 +346,7 @@ def _make_sales_order(source_name, target_doc=None, ignore_permissions=False):
 				"doctype": "Sales Order Item",
 				"field_map": {"parent": "prevdoc_docname", "name": "quotation_item"},
 				"postprocess": update_item,
-				"condition": lambda doc: doc.qty > 0,
+				"condition": can_map_row,
 			},
 			"Sales Taxes and Charges": {"doctype": "Sales Taxes and Charges", "add_if_empty": True},
 			"Sales Team": {"doctype": "Sales Team", "add_if_empty": True},
@@ -259,9 +356,6 @@ def _make_sales_order(source_name, target_doc=None, ignore_permissions=False):
 		set_missing_values,
 		ignore_permissions=ignore_permissions,
 	)
-
-	# postprocess: fetch shipping address, set missing values
-	doclist.set_onload("ignore_price_list", True)
 
 	return doclist
 
@@ -281,12 +375,8 @@ def set_expired_status():
 	# if not exists any SO, set status as Expired
 	frappe.db.multisql(
 		{
-			"mariadb": """UPDATE `tabQuotation`  SET `tabQuotation`.status = 'Expired' WHERE {cond} and not exists({so_against_quo})""".format(
-				cond=cond, so_against_quo=so_against_quo
-			),
-			"postgres": """UPDATE `tabQuotation` SET status = 'Expired' FROM `tabSales Order`, `tabSales Order Item` WHERE {cond} and not exists({so_against_quo})""".format(
-				cond=cond, so_against_quo=so_against_quo
-			),
+			"mariadb": f"""UPDATE `tabQuotation`  SET `tabQuotation`.status = 'Expired' WHERE {cond} and not exists({so_against_quo})""",
+			"postgres": f"""UPDATE `tabQuotation` SET status = 'Expired' FROM `tabSales Order`, `tabSales Order Item` WHERE {cond} and not exists({so_against_quo})""",
 		},
 		(nowdate()),
 	)
@@ -318,7 +408,11 @@ def _make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 		source_name,
 		{
 			"Quotation": {"doctype": "Sales Invoice", "validation": {"docstatus": ["=", 1]}},
-			"Quotation Item": {"doctype": "Sales Invoice Item", "postprocess": update_item},
+			"Quotation Item": {
+				"doctype": "Sales Invoice Item",
+				"postprocess": update_item,
+				"condition": lambda row: not row.is_alternative,
+			},
 			"Sales Taxes and Charges": {"doctype": "Sales Taxes and Charges", "add_if_empty": True},
 			"Sales Team": {"doctype": "Sales Team", "add_if_empty": True},
 		},
@@ -326,8 +420,6 @@ def _make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 		set_missing_values,
 		ignore_permissions=ignore_permissions,
 	)
-
-	doclist.set_onload("ignore_price_list", True)
 
 	return doclist
 
@@ -367,12 +459,15 @@ def _make_customer(source_name, ignore_permissions=False):
 						raise
 				except frappe.MandatoryError as e:
 					mandatory_fields = e.args[0].split(":")[1].split(",")
-					mandatory_fields = [customer.meta.get_label(field.strip()) for field in mandatory_fields]
+					mandatory_fields = [
+						_(customer.meta.get_label(field.strip())) for field in mandatory_fields
+					]
 
 					frappe.local.message_log = []
 					lead_link = frappe.utils.get_link_to_form("Lead", lead_name)
 					message = (
-						_("Could not auto create Customer due to the following missing mandatory field(s):") + "<br>"
+						_("Could not auto create Customer due to the following missing mandatory field(s):")
+						+ "<br>"
 					)
 					message += "<br><ul><li>" + "</li><li>".join(mandatory_fields) + "</li></ul>"
 					message += _("Please create Customer from Lead {0}.").format(lead_link)
