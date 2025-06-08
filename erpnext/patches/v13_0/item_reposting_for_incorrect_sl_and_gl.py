@@ -7,6 +7,7 @@ from erpnext.stock.stock_ledger import update_entries_after
 
 def execute():
 	doctypes_to_reload = [
+		("setup", "company"),
 		("stock", "repost_item_valuation"),
 		("stock", "stock_entry_detail"),
 		("stock", "purchase_receipt_item"),
@@ -37,7 +38,7 @@ def execute():
 	data = frappe.db.sql(
 		"""
 		SELECT
-			name, item_code, warehouse, voucher_type, voucher_no, posting_date, posting_time, company
+			name, item_code, warehouse, voucher_type, voucher_no, posting_date, posting_time, company, creation
 		FROM
 			`tabStock Ledger Entry`
 		WHERE
@@ -66,6 +67,7 @@ def execute():
 				"voucher_type": d.voucher_type,
 				"voucher_no": d.voucher_no,
 				"sle_id": d.name,
+				"creation": d.creation,
 			},
 			allow_negative_stock=True,
 		)
