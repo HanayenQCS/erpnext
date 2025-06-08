@@ -24,6 +24,54 @@ class Bin(Document):
 			- flt(self.reserved_qty)
 			- flt(self.reserved_qty_for_production)
 			- flt(self.reserved_qty_for_sub_contract)
+			- flt(self.reserved_qty_for_production_plan)
+		)
+
+	def update_reserved_qty_for_production_plan(self, skip_project_qty_update=False):
+		"""Update qty reserved for production from Production Plan tables
+		in open production plan"""
+		from erpnext.manufacturing.doctype.production_plan.production_plan import (
+			get_reserved_qty_for_production_plan,
+		)
+
+		reserved_qty_for_production_plan = get_reserved_qty_for_production_plan(
+			self.item_code, self.warehouse
+		)
+
+		if reserved_qty_for_production_plan is None and not self.reserved_qty_for_production_plan:
+			return
+
+		self.reserved_qty_for_production_plan = flt(reserved_qty_for_production_plan)
+
+		self.db_set(
+			"reserved_qty_for_production_plan",
+			flt(self.reserved_qty_for_production_plan),
+			update_modified=True,
+		)
+
+		if not skip_project_qty_update:
+			self.set_projected_qty()
+			self.db_set("projected_qty", self.projected_qty, update_modified=True)
+
+	def update_reserved_qty_for_for_sub_assembly(self):
+		from erpnext.manufacturing.doctype.production_plan.production_plan import (
+			get_reserved_qty_for_sub_assembly,
+		)
+
+		reserved_qty_for_production_plan = get_reserved_qty_for_sub_assembly(self.item_code, self.warehouse)
+
+		if reserved_qty_for_production_plan is None and not self.reserved_qty_for_production_plan:
+			return
+
+		self.reserved_qty_for_production_plan = flt(reserved_qty_for_production_plan)
+		self.set_projected_qty()
+
+		self.db_set(
+			{
+				"projected_qty": self.projected_qty,
+				"reserved_qty_for_production_plan": flt(self.reserved_qty_for_production_plan),
+			},
+			update_modified=True,
 		)
 
 	def update_reserved_qty_for_production(self):
@@ -31,15 +79,15 @@ class Bin(Document):
 		in open work orders"""
 		from erpnext.manufacturing.doctype.work_order.work_order import get_reserved_qty_for_production
 
-		self.reserved_qty_for_production = get_reserved_qty_for_production(
-			self.item_code, self.warehouse
-		)
-
-		self.set_projected_qty()
+		self.reserved_qty_for_production = get_reserved_qty_for_production(self.item_code, self.warehouse)
 
 		self.db_set(
 			"reserved_qty_for_production", flt(self.reserved_qty_for_production), update_modified=True
 		)
+
+		self.update_reserved_qty_for_production_plan(skip_project_qty_update=True)
+
+		self.set_projected_qty()
 		self.db_set("projected_qty", self.projected_qty, update_modified=True)
 
 	def update_reserved_qty_for_sub_contracting(self, subcontract_doctype="Subcontracting Order"):
@@ -79,9 +127,7 @@ class Bin(Document):
 		se_item = frappe.qb.DocType("Stock Entry Detail")
 
 		if frappe.db.field_exists("Stock Entry", "is_return"):
-			qty_field = (
-				Case().when(se.is_return == 1, se_item.transfer_qty * -1).else_(se_item.transfer_qty)
-			)
+			qty_field = Case().when(se.is_return == 1, se_item.transfer_qty * -1).else_(se_item.transfer_qty)
 		else:
 			qty_field = se_item.transfer_qty
 
@@ -141,6 +187,7 @@ def get_bin_details(bin_name):
 			"planned_qty",
 			"reserved_qty_for_production",
 			"reserved_qty_for_sub_contract",
+			"reserved_qty_for_production_plan",
 		],
 		as_dict=1,
 	)
@@ -155,17 +202,22 @@ def update_qty(bin_name, args):
 	sle = frappe.qb.DocType("Stock Ledger Entry")
 
 	# actual qty is not up to date in case of backdated transaction
-	if future_sle_exists(args):
+	if future_sle_exists(args, allow_force_reposting=False):
 		last_sle_qty = (
 			frappe.qb.from_(sle)
 			.select(sle.qty_after_transaction)
-			.where((sle.item_code == args.get("item_code")) & (sle.warehouse == args.get("warehouse")))
+			.where(
+				(sle.item_code == args.get("item_code"))
+				& (sle.warehouse == args.get("warehouse"))
+				& (sle.is_cancelled == 0)
+			)
 			.orderby(CombineDatetime(sle.posting_date, sle.posting_time), order=Order.desc)
 			.orderby(sle.creation, order=Order.desc)
 			.limit(1)
 			.run()
 		)
 
+		actual_qty = 0.0
 		if last_sle_qty:
 			actual_qty = last_sle_qty[0][0]
 
@@ -183,6 +235,7 @@ def update_qty(bin_name, args):
 		- flt(reserved_qty)
 		- flt(bin_details.reserved_qty_for_production)
 		- flt(bin_details.reserved_qty_for_sub_contract)
+		- flt(bin_details.reserved_qty_for_production_plan)
 	)
 
 	frappe.db.set_value(
