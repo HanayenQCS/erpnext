@@ -13,19 +13,26 @@ class Contract(Document):
 		name = self.party_name
 
 		if self.contract_template:
-			name += " - {} Agreement".format(self.contract_template)
+			name += f" - {self.contract_template} Agreement"
 
 		# If identical, append contract name with the next number in the iteration
 		if frappe.db.exists("Contract", name):
-			count = len(frappe.get_all("Contract", filters={"name": ["like", "%{}%".format(name)]}))
-			name = "{} - {}".format(name, count)
+			count = len(frappe.get_all("Contract", filters={"name": ["like", f"%{name}%"]}))
+			name = f"{name} - {count}"
 
 		self.name = _(name)
 
 	def validate(self):
+		self.set_missing_values()
 		self.validate_dates()
 		self.update_contract_status()
 		self.update_fulfilment_status()
+
+	def set_missing_values(self):
+		if not self.party_full_name:
+			field = self.party_type.lower() + "_name"
+			if res := frappe.db.get_value(self.party_type, self.party_name, field):
+				self.party_full_name = res
 
 	def before_submit(self):
 		self.signed_by_company = frappe.session.user
