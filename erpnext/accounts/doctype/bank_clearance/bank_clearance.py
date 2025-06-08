@@ -6,7 +6,7 @@ import frappe
 from frappe import _, msgprint
 from frappe.model.document import Document
 from frappe.query_builder.custom import ConstantColumn
-from frappe.utils import flt, fmt_money, getdate
+from frappe.utils import flt, fmt_money, get_link_to_form, getdate
 
 import erpnext
 
@@ -27,7 +27,7 @@ class BankClearance(Document):
 			condition = "and (clearance_date IS NULL or clearance_date='0000-00-00')"
 
 		journal_entries = frappe.db.sql(
-			"""
+			f"""
 			select
 				"Journal Entry" as payment_document, t1.name as payment_entry,
 				t1.cheque_no as cheque_number, t1.cheque_date,
@@ -41,23 +41,18 @@ class BankClearance(Document):
 				and ifnull(t1.is_opening, 'No') = 'No' {condition}
 			group by t2.account, t1.name
 			order by t1.posting_date ASC, t1.name DESC
-		""".format(
-				condition=condition
-			),
+		""",
 			{"account": self.account, "from": self.from_date, "to": self.to_date},
 			as_dict=1,
 		)
 
-		if self.bank_account:
-			condition += "and bank_account = %(bank_account)s"
-
 		payment_entries = frappe.db.sql(
-			"""
+			f"""
 			select
 				"Payment Entry" as payment_document, name as payment_entry,
 				reference_no as cheque_number, reference_date as cheque_date,
 				if(paid_from=%(account)s, paid_amount + total_taxes_and_charges, 0) as credit,
-				if(paid_from=%(account)s, 0, received_amount) as debit,
+				if(paid_from=%(account)s, 0, received_amount + total_taxes_and_charges) as debit,
 				posting_date, ifnull(party,if(paid_from=%(account)s,paid_to,paid_from)) as against_account, clearance_date,
 				if(paid_to=%(account)s, paid_to_account_currency, paid_from_account_currency) as account_currency
 			from `tabPayment Entry`
@@ -67,14 +62,11 @@ class BankClearance(Document):
 				{condition}
 			order by
 				posting_date ASC, name DESC
-		""".format(
-				condition=condition
-			),
+		""",
 			{
 				"account": self.account,
 				"from": self.from_date,
 				"to": self.to_date,
-				"bank_account": self.bank_account,
 			},
 			as_dict=1,
 		)
@@ -97,7 +89,7 @@ class BankClearance(Document):
 			.where(loan_disbursement.docstatus == 1)
 			.where(loan_disbursement.disbursement_date >= self.from_date)
 			.where(loan_disbursement.disbursement_date <= self.to_date)
-			.where(loan_disbursement.disbursement_account.isin([self.bank_account, self.account]))
+			.where(loan_disbursement.disbursement_account == self.account)
 			.orderby(loan_disbursement.disbursement_date)
 			.orderby(loan_disbursement.name, order=frappe.qb.desc)
 		)
@@ -125,18 +117,16 @@ class BankClearance(Document):
 			.where(loan_repayment.docstatus == 1)
 			.where(loan_repayment.posting_date >= self.from_date)
 			.where(loan_repayment.posting_date <= self.to_date)
-			.where(loan_repayment.payment_account.isin([self.bank_account, self.account]))
+			.where(loan_repayment.payment_account == self.account)
 		)
 
 		if not self.include_reconciled_entries:
 			query = query.where(loan_repayment.clearance_date.isnull())
 
 		if frappe.db.has_column("Loan Repayment", "repay_from_salary"):
-			query = query.where((loan_repayment.repay_from_salary == 0))
+			query = query.where(loan_repayment.repay_from_salary == 0)
 
-		query = query.orderby(loan_repayment.posting_date).orderby(
-			loan_repayment.name, order=frappe.qb.desc
-		)
+		query = query.orderby(loan_repayment.posting_date).orderby(loan_repayment.name, order=frappe.qb.desc)
 
 		loan_repayments = query.run(as_dict=True)
 
@@ -216,8 +206,11 @@ class BankClearance(Document):
 
 				if d.cheque_date and getdate(d.clearance_date) < getdate(d.cheque_date):
 					frappe.throw(
-						_("Row #{0}: Clearance date {1} cannot be before Cheque Date {2}").format(
-							d.idx, d.clearance_date, d.cheque_date
+						_("Row #{0}: For {1} Clearance date {2} cannot be before Cheque Date {3}").format(
+							d.idx,
+							get_link_to_form(d.payment_document, d.payment_entry),
+							d.clearance_date,
+							d.cheque_date,
 						)
 					)
 

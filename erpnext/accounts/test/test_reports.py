@@ -1,5 +1,4 @@
 import unittest
-from typing import List, Tuple
 
 from erpnext.tests.utils import ReportFilters, ReportName, execute_script_report
 
@@ -12,9 +11,9 @@ DEFAULT_FILTERS = {
 }
 
 
-REPORT_FILTER_TEST_CASES: List[Tuple[ReportName, ReportFilters]] = [
-	("General Ledger", {"group_by": "Group by Voucher (Consolidated)"}),
-	("General Ledger", {"group_by": "Group by Voucher (Consolidated)", "include_dimensions": 1}),
+REPORT_FILTER_TEST_CASES: list[tuple[ReportName, ReportFilters]] = [
+	("General Ledger", {"categorize_by": "Categorize by Voucher (Consolidated)"}),
+	("General Ledger", {"categorize_by": "Categorize by Voucher (Consolidated)", "include_dimensions": 1}),
 	("Accounts Payable", {"range1": 30, "range2": 60, "range3": 90, "range4": 120}),
 	("Accounts Receivable", {"range1": 30, "range2": 60, "range3": 90, "range4": 120}),
 	("Consolidated Financial Statement", {"report": "Balance Sheet"}),
@@ -30,10 +29,6 @@ REPORT_FILTER_TEST_CASES: List[Tuple[ReportName, ReportFilters]] = [
 	("Sales Register", {}),
 	("Sales Register", {"item_group": "All Item Groups"}),
 	("Purchase Register", {}),
-	(
-		"Tax Detail",
-		{"mode": "run", "report_name": "Tax Detail"},
-	),
 ]
 
 OPTIONAL_FILTERS = {}

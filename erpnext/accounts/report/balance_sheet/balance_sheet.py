@@ -7,6 +7,7 @@ from frappe import _
 from frappe.utils import cint, flt
 
 from erpnext.accounts.report.financial_statements import (
+	compute_growth_view_data,
 	get_columns,
 	get_data,
 	get_filtered_list_for_consolidated_report,
@@ -24,6 +25,8 @@ def execute(filters=None):
 		filters.periodicity,
 		company=filters.company,
 	)
+
+	filters.period_start_date = period_list[0]["year_start_date"]
 
 	currency = filters.presentation_currency or frappe.get_cached_value(
 		"Company", filters.company, "default_currency"
@@ -93,13 +96,16 @@ def execute(filters=None):
 		filters.periodicity, period_list, filters.accumulated_values, company=filters.company
 	)
 
-	chart = get_chart_data(filters, columns, asset, liability, equity)
+	chart = get_chart_data(filters, columns, asset, liability, equity, currency)
 
-	report_summary = get_report_summary(
-		period_list, asset, liability, equity, provisional_profit_loss, total_credit, currency, filters
+	report_summary, primitive_summary = get_report_summary(
+		period_list, asset, liability, equity, provisional_profit_loss, currency, filters
 	)
 
-	return columns, data, message, chart, report_summary
+	if filters.get("selected_view") == "Growth":
+		compute_growth_view_data(data, period_list)
+
+	return columns, data, message, chart, report_summary, primitive_summary
 
 
 def get_provisional_profit_loss(
@@ -174,12 +180,10 @@ def get_report_summary(
 	liability,
 	equity,
 	provisional_profit_loss,
-	total_credit,
 	currency,
 	filters,
 	consolidated=False,
 ):
-
 	net_asset, net_liability, net_equity, net_provisional_profit_loss = 0.0, 0.0, 0.0, 0.0
 
 	if filters.get("accumulated_values"):
@@ -216,10 +220,10 @@ def get_report_summary(
 			"datatype": "Currency",
 			"currency": currency,
 		},
-	]
+	], (net_asset - net_liability + net_equity)
 
 
-def get_chart_data(filters, columns, asset, liability, equity):
+def get_chart_data(filters, columns, asset, liability, equity, currency):
 	labels = [d.get("label") for d in columns[2:]]
 
 	asset_data, liability_data, equity_data = [], [], []
@@ -246,5 +250,9 @@ def get_chart_data(filters, columns, asset, liability, equity):
 		chart["type"] = "bar"
 	else:
 		chart["type"] = "line"
+
+	chart["fieldtype"] = "Currency"
+	chart["options"] = "currency"
+	chart["currency"] = currency
 
 	return chart
