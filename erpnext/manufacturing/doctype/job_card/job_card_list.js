@@ -1,9 +1,8 @@
-frappe.listview_settings['Job Card'] = {
+frappe.listview_settings["Job Card"] = {
 	has_indicator_for_draft: true,
 	hide_name_column: true,
 	add_fields: ['operation', 'status', 'work_order', 'sampling_work_order', 'order_form_qcs'],
-
-	get_indicator: function(doc) {
+	get_indicator: function (doc) {
 		const status_colors = {
 			"Work In Progress": "orange",
 			"Completed": "green",
