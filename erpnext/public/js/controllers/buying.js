@@ -136,7 +136,7 @@ erpnext.buying.BuyingController = class BuyingController extends erpnext.Transac
 	}
 
 	toggle_subcontracting_fields() {
-		if (in_list(['Purchase Receipt', 'Purchase Invoice'], this.frm.doc.doctype)) {
+		if (['Purchase Receipt', 'Purchase Invoice'].includes(this.frm.doc.doctype)) {
 			this.frm.fields_dict.supplied_items.grid.update_docfield_property('consumed_qty',
 				'read_only', this.frm.doc.__onload && this.frm.doc.__onload.backflush_based_on === 'BOM');
 
@@ -174,7 +174,7 @@ erpnext.buying.BuyingController = class BuyingController extends erpnext.Transac
 	}
 
 	qty(doc, cdt, cdn) {
-		if ((doc.doctype == "Purchase Receipt") || (doc.doctype == "Purchase Invoice" && (doc.update_stock || doc.is_return))) {
+		if ((doc.doctype == "Purchase Receipt") || (doc.doctype == "Purchase Invoice" && doc.update_stock)) {
 			this.calculate_received_qty(doc, cdt, cdn)
 		}
 		super.qty(doc, cdt, cdn);
@@ -225,7 +225,8 @@ erpnext.buying.BuyingController = class BuyingController extends erpnext.Transac
 				args: {
 					item_code: item.item_code,
 					warehouse: item.warehouse,
-					company: doc.company
+					company: doc.company,
+					include_child_warehouses: true
 				}
 			});
 		}
