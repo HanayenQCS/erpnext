@@ -6,8 +6,8 @@ frappe.provide("erpnext.accounts.dimensions");
 {% include 'erpnext/public/js/controllers/buying.js' %};
 
 frappe.ui.form.on("Purchase Order", {
-	setup: function(frm) {
-
+	setup: function (frm) {
+		frm.ignore_doctypes_on_cancel_all = ["Unreconcile Payment", "Unreconcile Payment Entries"];
 		if (frm.doc.is_old_subcontracting_flow) {
 			frm.set_query("reserve_warehouse", "supplied_items", function() {
 				return {
@@ -180,7 +180,7 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 				this.frm.fields_dict.items_section.wrapper.removeClass("hide-border");
 			}
 
-			if(!in_list(["Closed", "Delivered"], doc.status)) {
+			if(!["Closed", "Delivered"].includes(doc.status)) {
 				if(this.frm.doc.status !== 'Closed' && flt(this.frm.doc.per_received) < 100 && flt(this.frm.doc.per_billed) < 100) {
 					// Don't add Update Items button if the PO is following the new subcontracting flow.
 					if (!(this.frm.doc.is_subcontracted && !this.frm.doc.is_old_subcontracting_flow)) {
@@ -205,13 +205,16 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 					}
 				}
 
-				if(is_drop_ship && doc.status!="Delivered") {
-					this.frm.add_custom_button(__('Delivered'),
-						this.delivered_by_supplier, __("Status"));
+				if (is_drop_ship && doc.status != "Delivered") {
+					this.frm.add_custom_button(
+						__("Delivered"),
+						this.delivered_by_supplier.bind(this),
+						__("Status")
+					);
 
 					this.frm.page.set_inner_btn_group_as_primary(__("Status"));
 				}
-			} else if(in_list(["Closed", "Delivered"], doc.status)) {
+			} else if(["Closed", "Delivered"].includes(doc.status)) {
 				if (this.frm.has_perm("submit")) {
 					this.frm.add_custom_button(__('Re-open'), () => this.unclose_purchase_order(), __("Status"));
 				}
@@ -236,7 +239,11 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 							this.make_purchase_invoice, __('Create'));
 
 					if(flt(doc.per_billed) < 100 && doc.status != "Delivered") {
-						cur_frm.add_custom_button(__('Payment'), cur_frm.cscript.make_payment_entry, __('Create'));
+						this.frm.add_custom_button(
+							__('Payment'),
+							() => this.make_payment_entry(),
+							__('Create')
+						);
 					}
 
 					if(flt(doc.per_billed) < 100) {
@@ -282,7 +289,7 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 			source_name: this.frm.doc.supplier,
 			target: this.frm,
 			setters: {
-				company: me.frm.doc.company
+				company: this.frm.doc.company
 			},
 			get_query_filters: {
 				docstatus: ["!=", 2],
@@ -365,7 +372,7 @@ erpnext.buying.PurchaseOrderController = class PurchaseOrderController extends e
 					},
 					allow_child_item_selection: true,
 					child_fieldname: "items",
-					child_columns: ["item_code", "qty"]
+					child_columns: ["item_code", "qty", "ordered_qty"]
 				})
 			}, __("Get Items From"));
 
