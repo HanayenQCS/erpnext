@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
 
     name: Patch Test
@@ -43,9 +43,11 @@ jobs:
           fi
 
       - name: Setup Python
-        uses: "gabrielfalcao/pyenv-action@v9"
+        uses: "actions/setup-python@v4"
         with:
-          versions: 3.10:latest, 3.7:latest
+          python-version: |
+              3.7
+              3.10
 
       - name: Setup Node
         uses: actions/setup-node@v2
@@ -57,7 +59,7 @@ jobs:
         run: echo "127.0.0.1 test_site" | sudo tee -a /etc/hosts
 
       - name: Cache pip
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/*requirements.txt', '**/pyproject.toml') }}
@@ -66,7 +68,7 @@ jobs:
             ${{ runner.os }}-
 
       - name: Cache node modules
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         env:
           cache-name: cache-node-modules
         with:
@@ -81,7 +83,7 @@ jobs:
         id: yarn-cache-dir-path
         run: echo "::set-output name=dir::$(yarn cache dir)"
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v4
         id: yarn-cache
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
@@ -92,7 +94,6 @@ jobs:
       - name: Install
         run: |
           pip install frappe-bench
-          pyenv global $(pyenv versions | grep '3.10')
           bash ${GITHUB_WORKSPACE}/.github/helper/install.sh
         env:
           DB: mariadb
@@ -107,7 +108,6 @@ jobs:
           git -C "apps/frappe" remote set-url upstream https://github.com/frappe/frappe.git
           git -C "apps/erpnext" remote set-url upstream https://github.com/frappe/erpnext.git
 
-          pyenv global $(pyenv versions | grep '3.7')
           for version in $(seq 12 13)
           do
               echo "Updating to v$version"
@@ -120,7 +120,7 @@ jobs:
               git -C "apps/erpnext" checkout -q -f $branch_name
 
               rm -rf ~/frappe-bench/env
-              bench setup env
+              bench setup env --python python3.7
               bench pip install -e ./apps/payments
               bench pip install -e ./apps/erpnext
 
@@ -132,9 +132,8 @@ jobs:
           git -C "apps/frappe" checkout -q -f "${GITHUB_BASE_REF:-${GITHUB_REF##*/}}"
           git -C "apps/erpnext" checkout -q -f "$GITHUB_SHA"
 
-          pyenv global $(pyenv versions | grep '3.10')
           rm -rf ~/frappe-bench/env
-          bench -v setup env
+          bench -v setup env --python python3.10
           bench pip install -e ./apps/payments
           bench pip install -e ./apps/erpnext
 
