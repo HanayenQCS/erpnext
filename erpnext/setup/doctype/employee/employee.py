@@ -42,6 +42,7 @@ class Employee(NestedSet):
 		self.validate_email()
 		self.validate_status()
 		self.validate_reports_to()
+		self.set_preferred_email()
 		self.validate_preferred_email()
 
 		if self.user_id:
@@ -49,6 +50,9 @@ class Employee(NestedSet):
 		else:
 			existing_user_id = frappe.db.get_value("Employee", self.name, "user_id")
 			if existing_user_id:
+				user = frappe.get_doc("User", existing_user_id)
+				validate_employee_role(user, ignore_emp_check=True)
+				user.save(ignore_permissions=True)
 				remove_user_permission("Employee", self.name, existing_user_id)
 
 	def after_rename(self, old, new, merge):
@@ -61,14 +65,12 @@ class Employee(NestedSet):
 
 	def validate_user_details(self):
 		if self.user_id:
-			data = frappe.db.get_value("User", self.user_id, ["enabled", "user_image"], as_dict=1)
+			data = frappe.db.get_value("User", self.user_id, ["enabled"], as_dict=1)
 
 			if not data:
 				self.user_id = None
 				return
 
-			if data.get("user_image") and self.image == "":
-				self.image = data.get("user_image")
 			self.validate_for_enabled_user_id(data.get("enabled", 0))
 			self.validate_duplicate_user_id()
 
@@ -181,9 +183,7 @@ class Employee(NestedSet):
 
 	def set_preferred_email(self):
 		preferred_email_field = frappe.scrub(self.prefered_contact_email)
-		if preferred_email_field:
-			preferred_email = self.get(preferred_email_field)
-			self.prefered_email = preferred_email
+		self.prefered_email = self.get(preferred_email_field) if preferred_email_field else None
 
 	def validate_status(self):
 		if self.status == "Left":
@@ -254,12 +254,22 @@ class Employee(NestedSet):
 			frappe.cache().hdel("employees_with_number", prev_number)
 
 
-def validate_employee_role(doc, method):
+def validate_employee_role(doc, method=None, ignore_emp_check=False):
 	# called via User hook
-	if "Employee" in [d.role for d in doc.get("roles")]:
-		if not frappe.db.get_value("Employee", {"user_id": doc.name}):
-			frappe.msgprint(_("Please set User ID field in an Employee record to set Employee Role"))
-			doc.get("roles").remove(doc.get("roles", {"role": "Employee"})[0])
+	if not ignore_emp_check:
+		if frappe.db.get_value("Employee", {"user_id": doc.name}):
+			return
+
+	user_roles = [d.role for d in doc.get("roles")]
+	if "Employee" in user_roles:
+		frappe.msgprint(_("User {0}: Removed Employee role as there is no mapped employee.").format(doc.name))
+		doc.get("roles").remove(doc.get("roles", {"role": "Employee"})[0])
+
+	if "Employee Self Service" in user_roles:
+		frappe.msgprint(
+			_("User {0}: Removed Employee Self Service role as there is no mapped employee.").format(doc.name)
+		)
+		doc.get("roles").remove(doc.get("roles", {"role": "Employee Self Service"})[0])
 
 
 def update_user_permissions(doc, method):
@@ -273,15 +283,13 @@ def update_user_permissions(doc, method):
 
 def get_employee_email(employee_doc):
 	return (
-		employee_doc.get("user_id")
-		or employee_doc.get("personal_email")
-		or employee_doc.get("company_email")
+		employee_doc.get("user_id") or employee_doc.get("personal_email") or employee_doc.get("company_email")
 	)
 
 
 def get_holiday_list_for_employee(employee, raise_exception=True):
 	if employee:
-		holiday_list, company = frappe.db.get_value("Employee", employee, ["holiday_list", "company"])
+		holiday_list, company = frappe.get_cached_value("Employee", employee, ["holiday_list", "company"])
 	else:
 		holiday_list = ""
 		company = frappe.db.get_single_value("Global Defaults", "default_company")
@@ -297,9 +305,7 @@ def get_holiday_list_for_employee(employee, raise_exception=True):
 	return holiday_list
 
 
-def is_holiday(
-	employee, date=None, raise_exception=True, only_non_weekly=False, with_description=False
-):
+def is_holiday(employee, date=None, raise_exception=True, only_non_weekly=False, with_description=False):
 	"""
 	Returns True if given Employee has an holiday on the given date
 	        :param employee: Employee `name`
@@ -369,6 +375,8 @@ def create_user(employee, user=None, email=None):
 		}
 	)
 	user.insert()
+	emp.user_id = user.name
+	emp.save()
 	return user.name
 
 
@@ -407,7 +415,6 @@ def get_employee_emails(employee_list):
 
 @frappe.whitelist()
 def get_children(doctype, parent=None, company=None, is_root=False, is_tree=False):
-
 	filters = [["status", "=", "Active"]]
 	if company and company != "All Companies":
 		filters.append(["company", "=", company])
